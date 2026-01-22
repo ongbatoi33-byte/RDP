@@ -1,10 +1,10 @@
-name: RDP-Web-Ngrok-Native
+name: RDP-Web-Final-Solution
 
 on:
   workflow_dispatch:
 
 jobs:
-  secure-rdp:
+  run-rdp-web:
     runs-on: windows-latest
     timeout-minutes: 3600
 
@@ -23,41 +23,41 @@ jobs:
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
 
-      - name: Cai dat Myrtille (Web RDP Gateway)
-        run: |
-          # Tai va cai dat Myrtille native cho Windows
-          $url = "https://github.com/cedrozane/myrtille/releases/download/v2.9.1/Myrtille_2.9.1_x86_x64.msi"
-          Invoke-WebRequest -Uri $url -OutFile "myrtille.msi"
-          Start-Process msiexec.exe -ArgumentList "/i", "myrtille.msi", "/quiet", "/norestart" -Wait
-
       - name: Cai dat Ngrok
-        shell: powershell
         run: |
           Invoke-WebRequest -Uri "https://bin.equinox.io/c/b34edq6jhPr/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
           Expand-Archive -Path "ngrok.zip" -DestinationPath "."
 
-      - name: Chay Ngrok Web Tunnel
+      - name: Cai dat RDP2Any (Web Gateway)
+        run: |
+          # Tai phiên bản chạy ngay không cần cài đặt
+          Invoke-WebRequest -Uri "https://github.com/SuRDP/RDP2Any/releases/download/v1.0/RDP2Any.exe" -OutFile "RDP2Any.exe"
+
+      - name: Chay Tunnel va Gateway
         shell: cmd
         run: |
           # THAY TOKEN CUA BAN VAO DAY
-          .\ngrok.exe config add-authtoken 36VSC1MKYRQquiWADmIOVrNvasZ_3zyQHhjAXVYNjawNbxPB9
-          # Myrtille mac dinh chay tren cong 8080 (HTTP) hoac 443 (HTTPS)
-          start /b .\ngrok.exe http 8080 > ngrok.log 2>&1
+          .\ngrok.exe config add-authtoken TOKEN_CUA_BAN
+          
+          # Chay Gateway Web RDP tren cong 80
+          start /b .\RDP2Any.exe
+          
+          # Mo tunnel Ngrok cho cong Web (80)
+          start /b .\ngrok.exe http 80 > ngrok.log 2>&1
 
-      - name: Lay Link Truy Cap Web
+      - name: Lay Link Truy Cap
         run: |
-          Write-Host "Dang lay link Web tu Ngrok..."
+          Write-Host "Dang khoi tao link Web..."
           Start-Sleep -Seconds 20
           $response = Invoke-RestMethod -Uri http://localhost:4040/api/tunnels
           $webUrl = $response.tunnels[0].public_url
           
           Write-Host "`n========================================" -ForegroundColor Green
-          Write-Host "TRUY CAP RDP QUA TRINH DUYET" -ForegroundColor Green
-          Write-Host "Link: $webUrl/Myrtille" -ForegroundColor Cyan
-          Write-Host "User: RDP" -ForegroundColor Cyan
-          Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
+          Write-Host "TRUY CAP RDP QUA WEB THANH CONG" -ForegroundColor Green
+          Write-Host "Link: $webUrl" -ForegroundColor Cyan
           Write-Host "----------------------------------------"
-          Write-Host "Luu y: Nhap 'localhost' vao o Server trong giao dien Web."
+          Write-Host "User: RDP | Pass: Oibanoi874@" -ForegroundColor Yellow
+          Write-Host "Luu y: Neu web hien thi bảng đăng nhập, hay nhap thong tin tren."
           Write-Host "========================================`n"
 
       - name: Duy tri
