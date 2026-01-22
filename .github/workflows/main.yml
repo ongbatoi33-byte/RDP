@@ -1,4 +1,4 @@
-name: RDP-TCP-LocalhostRun-Fixed
+name: RDP-Localtunnel-TCP
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          netsh advfirewall firewall add rule name="RDP-TCP" dir=in action=allow protocol=TCP localport=3389
+          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
       - name: Create RDP User
@@ -24,37 +24,43 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Open Tunnel
+      - name: Install Node.js & Localtunnel
+        run: |
+          # Localtunnel cần Node.js (đã có sẵn trên runner)
+          npm install -g localtunnel
+
+      - name: Start Tunnel
         shell: cmd
         run: |
-          start /b ssh -o StrictHostKeyChecking=no -R 80:localhost:3389 nokey@localhost.run > tunnel_log.txt 2>&1
+          # Chạy localtunnel cho cổng 3389
+          start /b lt --port 3389 > lt.log 2>&1
 
       - name: Get Connection Address
         run: |
-          Write-Host "Dang cho lay dia chi..."
-          Start-Sleep -Seconds 20
-          $log = Get-Content tunnel_log.txt -Raw
-          Write-Host "Nội dung Log:"
-          Write-Host $log
+          Write-Host "Đang lấy địa chỉ Localtunnel..."
+          Start-Sleep -Seconds 15
+          $log = Get-Content lt.log -Raw
+          Write-Host "Nội dung Log: $log"
           
-          if ($log -match "([a-zA-Z0-9-]+\.lhr\.life)") {
-              $addr = $matches[1]
+          if ($log -match "https://[a-zA-Z0-9-.]+\.loca\.lt") {
+              $url = $matches[0]
+              # Chuyển đổi HTTPS URL sang địa chỉ TCP cho RDP
+              $addr = $url -replace "https://", ""
               Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "DIA CHI KET NOI RDP:" -ForegroundColor Green
+              Write-Host "KẾT NỐI RDP QUA LOCALTUNNEL" -ForegroundColor Green
               Write-Host "Address: $addr" -ForegroundColor Cyan
               Write-Host "User: RDP" -ForegroundColor Cyan
               Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
+              Write-Host "----------------------------------------"
+              Write-Host "Lưu ý: Nếu không kết nối được trực tiếp, hãy thử dùng trình duyệt truy cập link trên để xác nhận IP trước."
               Write-Host "========================================`n"
           } else {
-              Write-Host "Khong tim thay .lhr.life, dang thu Serveo..."
-              start-process ssh -ArgumentList "-o StrictHostKeyChecking=no -R 0:localhost:3389 serveo.net" -RedirectStandardOutput "tunnel_log.txt"
-              Start-Sleep -Seconds 10
-              Get-Content tunnel_log.txt
+              Write-Error "Không lấy được địa chỉ. Hãy thử lại."
           }
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Server is running..."
+              Write-Host "[$(Get-Date)] Tunnel is active..."
               Start-Sleep -Seconds 300
           }
