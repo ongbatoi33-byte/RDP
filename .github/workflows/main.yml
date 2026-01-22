@@ -1,4 +1,4 @@
-name: RDP-Pagekite-TCP
+name: RDP-Serveo-TCP-Direct
 
 on:
   workflow_dispatch:
@@ -9,14 +9,17 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Configure Windows RDP
+      - name: Cau hinh Windows RDP
         run: |
+          # Bat Remote Desktop va tat NLA de dien thoai de ket noi
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          
+          # Mo firewall cho cong 3389
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
-      - name: Create RDP User
+      - name: Tao nguoi dung RDP
         run: |
           $password = "Oibanoi874@"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
@@ -24,41 +27,38 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Setup and Run Pagekite
-        shell: powershell
+      - name: Khoi tao Tunnel Serveo
+        shell: cmd
         run: |
-          # Tải pagekite.py
-          Invoke-WebRequest -Uri "https://pagekite.net/pk/pagekite.py" -OutFile "pagekite.py"
-          
-          # Chạy pagekite để forward cổng 3389
-          # Sử dụng tên miền ngẫu nhiên .pagekite.me
-          $name = "rdp-gh-" + (Get-Random -Maximum 99999)
-          Start-Process python -ArgumentList "pagekite.py 3389 $name.pagekite.me" -RedirectStandardOutput "pagekite.log" -NoNewWindow
-          
-          echo "KITE_NAME=$name" >> $env:GITHUB_ENV
+          # Chay SSH tunnel voi che do tu dong ket noi lai
+          start /b ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:localhost:3389 serveo.net > serveo.log 2>&1
 
-      - name: Get Connection Address
+      - name: Lay dia chi ket noi
         run: |
-          Write-Host "Dang cho Pagekite khoi tao..."
+          Write-Host "Dang cho Serveo cap cong (Port)..."
           Start-Sleep -Seconds 20
-          $log = Get-Content pagekite.log -Raw
-          Write-Host "--- LOG ---"
+          $log = Get-Content serveo.log -Raw
+          Write-Host "--- NHAT KY HE THONG ---"
           Write-Host $log
           
-          # Pagekite thường cung cấp địa chỉ dạng domain.pagekite.me
-          # Với TCP, bạn sẽ kết nối qua domain và port được cấp
-          Write-Host "`n========================================" -ForegroundColor Green
-          Write-Host "THONG TIN KET NOI RDP" -ForegroundColor Green
-          Write-Host "Address: $env:KITE_NAME.pagekite.me" -ForegroundColor Cyan
-          Write-Host "User: RDP" -ForegroundColor Cyan
-          Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
-          Write-Host "----------------------------------------"
-          Write-Host "Neu ket noi truc tiep khong duoc, kiem tra log de xem port TCP"
-          Write-Host "========================================`n"
+          # Tim dia chi dang serveo.net:xxxxx
+          if ($log -match "serveo\.net:\d+") {
+              $addr = $matches[0]
+              Write-Host "`n========================================" -ForegroundColor Green
+              Write-Host "KET NOI RDP THANH CONG" -ForegroundColor Green
+              Write-Host "Dia chi (Host): $addr" -ForegroundColor Cyan
+              Write-Host "User: RDP" -ForegroundColor Cyan
+              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
+              Write-Host "----------------------------------------"
+              Write-Host "Huong dan: Nhap $addr vao app aRDP cua ban." -ForegroundColor Yellow
+              Write-Host "========================================`n"
+          } else {
+              Write-Error "Khong lay duoc dia chi. Vui long bam 'Re-run all jobs'."
+          }
 
-      - name: Keep Alive
+      - name: Duy tri ket noi
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Server Live..."
+              $time = Get-Date -Format "HH:mm:ss"
+              Write-Host "[$time] May chu RDP dang truc tuyen..."
               Start-Sleep -Seconds 300
-          }
