@@ -1,21 +1,18 @@
-name: RDP-Serveo-TCP-Direct
+name: RDP-Web-Browser
 
 on:
   workflow_dispatch:
 
 jobs:
-  secure-rdp:
+  web-rdp:
     runs-on: windows-latest
     timeout-minutes: 3600
 
     steps:
       - name: Cau hinh Windows RDP
         run: |
-          # Bat Remote Desktop va tat NLA de dien thoai de ket noi
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          
-          # Mo firewall cho cong 3389
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
@@ -25,40 +22,39 @@ jobs:
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Khoi tao Tunnel Serveo
+      - name: Cai dat Myrtille (Web Gateway)
+        run: |
+          # Myrtille cho phép truy cập RDP qua trình duyệt (HTML5)
+          Invoke-WebRequest -Uri "https://github.com/cedrozane/myrtille/releases/download/v2.9.1/Myrtille_2.9.1_x86_x64.msi" -OutFile "myrtille.msi"
+          Start-Process msiexec.exe -ArgumentList "/i", "myrtille.msi", "/quiet", "/norestart" -Wait
+
+      - name: Mo luong Web qua Serveo
         shell: cmd
         run: |
-          # Chay SSH tunnel voi che do tu dong ket noi lai
-          start /b ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:localhost:3389 serveo.net > serveo.log 2>&1
+          # Forward cong 80 (Web RDP) ra ngoai qua Serveo
+          start /b ssh -o StrictHostKeyChecking=no -R 80:localhost:80 serveo.net > web_rdp.log 2>&1
 
-      - name: Lay dia chi ket noi
+      - name: Lay link truy cap Web
         run: |
-          Write-Host "Dang cho Serveo cap cong (Port)..."
-          Start-Sleep -Seconds 20
-          $log = Get-Content serveo.log -Raw
-          Write-Host "--- NHAT KY HE THONG ---"
-          Write-Host $log
+          Write-Host "Dang tao link truy cap Web RDP..."
+          Start-Sleep -Seconds 30
+          $log = Get-Content web_rdp.log -Raw
           
-          # Tim dia chi dang serveo.net:xxxxx
-          if ($log -match "serveo\.net:\d+") {
-              $addr = $matches[0]
+          if ($log -match "https://[a-zA-Z0-9-.]+\.serveo\.net") {
+              $webUrl = $matches[0]
               Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "KET NOI RDP THANH CONG" -ForegroundColor Green
-              Write-Host "Dia chi (Host): $addr" -ForegroundColor Cyan
+              Write-Host "TRUY CAP RDP QUA TRINH DUYET" -ForegroundColor Green
+              Write-Host "Link: $webUrl/Myrtille" -ForegroundColor Cyan
               Write-Host "User: RDP" -ForegroundColor Cyan
               Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
               Write-Host "----------------------------------------"
-              Write-Host "Huong dan: Nhap $addr vao app aRDP cua ban." -ForegroundColor Yellow
+              Write-Host "Luu y: Mo link tren bang Chrome/Safari."
               Write-Host "========================================`n"
           } else {
-              Write-Error "Khong lay duoc dia chi. Vui long bam 'Re-run all jobs'."
+              Write-Error "Khong tao duoc link Web. Hay thu lai."
           }
 
-      - name: Duy tri ket noi
+      - name: Duy tri
         run: |
-          while ($true) {
-              $time = Get-Date -Format "HH:mm:ss"
-              Write-Host "[$time] May chu RDP dang truc tuyen..."
-              Start-Sleep -Seconds 300
+          while ($true) { Start-Sleep -Seconds 300 }
