@@ -1,4 +1,4 @@
-name: RDP-TCP-LocalhostRun
+name: RDP-TCP-LocalhostRun-Fixed
 
 on:
   workflow_dispatch:
@@ -13,7 +13,6 @@ jobs:
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          # Mở full quyền cho RDP trên Firewall
           netsh advfirewall firewall add rule name="RDP-TCP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
@@ -25,39 +24,37 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Open Tunnel (Localhost.run)
+      - name: Open Tunnel
         shell: cmd
         run: |
-          # Dùng SSH chuẩn để forward cổng 3389 qua localhost.run
-          # -o StrictHostKeyChecking=no để tránh dừng lại hỏi xác thực
           start /b ssh -o StrictHostKeyChecking=no -R 80:localhost:3389 nokey@localhost.run > tunnel_log.txt 2>&1
 
       - name: Get Connection Address
         run: |
-          Write-Host "Đang lấy địa chỉ kết nối..."
+          Write-Host "Dang cho lay dia chi..."
           Start-Sleep -Seconds 20
-          
           $log = Get-Content tunnel_log.txt -Raw
-          Write-Host "Raw Log: $log"
+          Write-Host "Nội dung Log:"
+          Write-Host $log
           
-          # Lọc lấy địa chỉ .lhr.life (đây là domain của localhost.run)
           if ($log -match "([a-zA-Z0-9-]+\.lhr\.life)") {
               $addr = $matches[1]
               Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "ĐỊA CHỈ KẾT NỐI RDP MỚI" -ForegroundColor Green
+              Write-Host "DIA CHI KET NOI RDP:" -ForegroundColor Green
               Write-Host "Address: $addr" -ForegroundColor Cyan
               Write-Host "User: RDP" -ForegroundColor Cyan
               Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
-              Write-Host "----------------------------------------"
-              Write-Host "Mở mstsc và nhập: $addr" -ForegroundColor Yellow
               Write-Host "========================================`n"
           } else {
-              Write-Error "Không lấy được địa chỉ. Thử chạy lại workflow hoặc kiểm tra log trên."
+              Write-Host "Khong tim thay .lhr.life, dang thu Serveo..."
+              start-process ssh -ArgumentList "-o StrictHostKeyChecking=no -R 0:localhost:3389 serveo.net" -RedirectStandardOutput "tunnel_log.txt"
+              Start-Sleep -Seconds 10
+              Get-Content tunnel_log.txt
           }
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Server đang chạy..."
+              Write-Host "[$(Get-Date)] RDP Server is running..."
               Start-Sleep -Seconds 300
           }
