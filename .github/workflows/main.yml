@@ -1,4 +1,4 @@
-name: RDP-Localtunnel-TCP
+name: RDP-Tmate-Final
 
 on:
   workflow_dispatch:
@@ -24,43 +24,33 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Install Node.js & Localtunnel
-        run: |
-          # Localtunnel cần Node.js (đã có sẵn trên runner)
-          npm install -g localtunnel
-
-      - name: Start Tunnel
+      - name: Install and Setup Tmate
         shell: cmd
         run: |
-          # Chạy localtunnel cho cổng 3389
-          start /b lt --port 3389 > lt.log 2>&1
+          choco install tmate -y
+          tmate -S /tmp/tmate.sock new-session -d
+          tmate -S /tmp/tmate.sock wait tmate-ready
+          tmate -S /tmp/tmate.sock display -p "#{tmate_ssh}" > tmate_link.txt
 
       - name: Get Connection Address
         run: |
-          Write-Host "Đang lấy địa chỉ Localtunnel..."
-          Start-Sleep -Seconds 15
-          $log = Get-Content lt.log -Raw
-          Write-Host "Nội dung Log: $log"
+          $rawLink = Get-Content tmate_link.txt
+          $sshAddr = $rawLink -replace "ssh ", ""
           
-          if ($log -match "https://[a-zA-Z0-9-.]+\.loca\.lt") {
-              $url = $matches[0]
-              # Chuyển đổi HTTPS URL sang địa chỉ TCP cho RDP
-              $addr = $url -replace "https://", ""
-              Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "KẾT NỐI RDP QUA LOCALTUNNEL" -ForegroundColor Green
-              Write-Host "Address: $addr" -ForegroundColor Cyan
-              Write-Host "User: RDP" -ForegroundColor Cyan
-              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
-              Write-Host "----------------------------------------"
-              Write-Host "Lưu ý: Nếu không kết nối được trực tiếp, hãy thử dùng trình duyệt truy cập link trên để xác nhận IP trước."
-              Write-Host "========================================`n"
-          } else {
-              Write-Error "Không lấy được địa chỉ. Hãy thử lại."
-          }
+          Write-Host "`n========================================" -ForegroundColor Green
+          Write-Host "CÁCH KẾT NỐI (KHÔNG CẦN CÀI APP)" -ForegroundColor Green
+          Write-Host "----------------------------------------"
+          Write-Host "BƯỚC 1: Mở Terminal (CMD) trên máy bạn và chạy lệnh:" -ForegroundColor Yellow
+          Write-Host "ssh -L 3389:127.0.0.1:3389 $sshAddr" -ForegroundColor Cyan
+          Write-Host "----------------------------------------"
+          Write-Host "BƯỚC 2: Mở Remote Desktop Connection (mstsc)" -ForegroundColor Yellow
+          Write-Host "Nhập địa chỉ: 127.0.0.1" -ForegroundColor Cyan
+          Write-Host "User: RDP | Pass: Oibanoi874@" -ForegroundColor Cyan
+          Write-Host "========================================`n"
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] Tunnel is active..."
+              Write-Host "[$(Get-Date)] RDP Server đang chạy ổn định..."
               Start-Sleep -Seconds 300
           }
