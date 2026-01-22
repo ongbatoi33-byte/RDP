@@ -1,4 +1,4 @@
-name: RDP-Tmate-Final
+name: RDP-Pinggy-TCP
 
 on:
   workflow_dispatch:
@@ -24,33 +24,36 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Install and Setup Tmate
+      - name: Start Pinggy Tunnel
         shell: cmd
         run: |
-          choco install tmate -y
-          tmate -S /tmp/tmate.sock new-session -d
-          tmate -S /tmp/tmate.sock wait tmate-ready
-          tmate -S /tmp/tmate.sock display -p "#{tmate_ssh}" > tmate_link.txt
+          start /b ssh -o StrictHostKeyChecking=no -p 443 -R 0:localhost:3389 tcp@a.pinggy.io > pinggy.log 2>&1
 
       - name: Get Connection Address
         run: |
-          $rawLink = Get-Content tmate_link.txt
-          $sshAddr = $rawLink -replace "ssh ", ""
+          Write-Host "Dang cho Pinggy cap dia chi..."
+          Start-Sleep -Seconds 15
+          $log = Get-Content pinggy.log -Raw
+          Write-Host "--- LOG OUTPUT ---"
+          Write-Host $log
           
-          Write-Host "`n========================================" -ForegroundColor Green
-          Write-Host "CÁCH KẾT NỐI (KHÔNG CẦN CÀI APP)" -ForegroundColor Green
-          Write-Host "----------------------------------------"
-          Write-Host "BƯỚC 1: Mở Terminal (CMD) trên máy bạn và chạy lệnh:" -ForegroundColor Yellow
-          Write-Host "ssh -L 3389:127.0.0.1:3389 $sshAddr" -ForegroundColor Cyan
-          Write-Host "----------------------------------------"
-          Write-Host "BƯỚC 2: Mở Remote Desktop Connection (mstsc)" -ForegroundColor Yellow
-          Write-Host "Nhập địa chỉ: 127.0.0.1" -ForegroundColor Cyan
-          Write-Host "User: RDP | Pass: Oibanoi874@" -ForegroundColor Cyan
-          Write-Host "========================================`n"
+          if ($log -match "tcp\.pinggy\.io:\d+") {
+              $addr = $matches[0]
+              Write-Host "`n========================================" -ForegroundColor Green
+              Write-Host "KET NOI RDP QUA PINGGY (TCP)" -ForegroundColor Green
+              Write-Host "Address: $addr" -ForegroundColor Cyan
+              Write-Host "User: RDP" -ForegroundColor Cyan
+              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
+              Write-Host "----------------------------------------"
+              Write-Host "Copy dia chi tren va dan vao mstsc"
+              Write-Host "========================================`n"
+          } else {
+              Write-Error "Khong lay duoc dia chi. Vui long thu lai."
+          }
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Server đang chạy ổn định..."
+              Write-Host "[$(Get-Date)] RDP Live..."
               Start-Sleep -Seconds 300
           }
