@@ -1,4 +1,4 @@
-name: RDP-Pinggy-TCP
+name: RDP-Pagekite-TCP
 
 on:
   workflow_dispatch:
@@ -24,36 +24,41 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
 
-      - name: Start Pinggy Tunnel
-        shell: cmd
+      - name: Setup and Run Pagekite
+        shell: powershell
         run: |
-          start /b ssh -o StrictHostKeyChecking=no -p 443 -R 0:localhost:3389 tcp@a.pinggy.io > pinggy.log 2>&1
+          # Tải pagekite.py
+          Invoke-WebRequest -Uri "https://pagekite.net/pk/pagekite.py" -OutFile "pagekite.py"
+          
+          # Chạy pagekite để forward cổng 3389
+          # Sử dụng tên miền ngẫu nhiên .pagekite.me
+          $name = "rdp-gh-" + (Get-Random -Maximum 99999)
+          Start-Process python -ArgumentList "pagekite.py 3389 $name.pagekite.me" -RedirectStandardOutput "pagekite.log" -NoNewWindow
+          
+          echo "KITE_NAME=$name" >> $env:GITHUB_ENV
 
       - name: Get Connection Address
         run: |
-          Write-Host "Dang cho Pinggy cap dia chi..."
-          Start-Sleep -Seconds 15
-          $log = Get-Content pinggy.log -Raw
-          Write-Host "--- LOG OUTPUT ---"
+          Write-Host "Dang cho Pagekite khoi tao..."
+          Start-Sleep -Seconds 20
+          $log = Get-Content pagekite.log -Raw
+          Write-Host "--- LOG ---"
           Write-Host $log
           
-          if ($log -match "tcp\.pinggy\.io:\d+") {
-              $addr = $matches[0]
-              Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "KET NOI RDP QUA PINGGY (TCP)" -ForegroundColor Green
-              Write-Host "Address: $addr" -ForegroundColor Cyan
-              Write-Host "User: RDP" -ForegroundColor Cyan
-              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
-              Write-Host "----------------------------------------"
-              Write-Host "Copy dia chi tren va dan vao mstsc"
-              Write-Host "========================================`n"
-          } else {
-              Write-Error "Khong lay duoc dia chi. Vui long thu lai."
-          }
+          # Pagekite thường cung cấp địa chỉ dạng domain.pagekite.me
+          # Với TCP, bạn sẽ kết nối qua domain và port được cấp
+          Write-Host "`n========================================" -ForegroundColor Green
+          Write-Host "THONG TIN KET NOI RDP" -ForegroundColor Green
+          Write-Host "Address: $env:KITE_NAME.pagekite.me" -ForegroundColor Cyan
+          Write-Host "User: RDP" -ForegroundColor Cyan
+          Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
+          Write-Host "----------------------------------------"
+          Write-Host "Neu ket noi truc tiep khong duoc, kiem tra log de xem port TCP"
+          Write-Host "========================================`n"
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Live..."
+              Write-Host "[$(Get-Date)] RDP Server Live..."
               Start-Sleep -Seconds 300
           }
