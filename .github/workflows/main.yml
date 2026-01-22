@@ -37,7 +37,7 @@ jobs:
         shell: cmd
         run: |
           # THAY TOKEN CUA BAN VAO DAY
-          .\ngrok.exe config add-authtoken TOKEN_CUA_BAN
+          .\ngrok.exe config add-authtoken 36VSC1MKYRQquiWADmIOVrNvasZ_3zyQHhjAXVYNjawNbxPB9
           
           # Chay Gateway Web RDP tren cong 80
           start /b .\RDP2Any.exe
