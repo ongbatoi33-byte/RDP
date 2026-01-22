@@ -1,4 +1,4 @@
-name: RDP-Bore-TCP
+name: RDP-Bore-TCP-Fixed
 
 on:
   workflow_dispatch:
@@ -11,11 +11,8 @@ jobs:
     steps:
       - name: Configure Windows RDP
         run: |
-          # Bật RDP và tắt NLA
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          
-          # Mở Firewall cổng 3389
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
@@ -29,40 +26,39 @@ jobs:
 
       - name: Install & Run Bore
         run: |
-          # Tải bản Bore mới nhất cho Windows
           Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile "bore.zip"
           Expand-Archive -Path "bore.zip" -DestinationPath "."
-          
-          # Chạy bore tunnel TCP cổng 3389 về phía server bore.pub
-          # Lưu log ra file để lấy port ngẫu nhiên
-          Start-Process -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore.log" -NoNewWindow
+          # Chạy bore và ghi log vào bore.txt
+          Start-Process -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore.txt" -NoNewWindow
           
       - name: Get Connection Address
         run: |
           Write-Host "Đang chờ Bore cấp phát cổng kết nối..."
-          Start-Sleep -Seconds 10
+          # Đợi lâu hơn một chút để đảm bảo log đã được ghi
+          Start-Sleep -Seconds 15
           
-          $log = Get-Content bore.log
-          Write-Host "Bore Log: $log"
+          $logContent = Get-Content -Path "bore.txt" -Raw
+          Write-Host "--- Nội dung Log Bore ---"
+          Write-Host $logContent
+          Write-Host "------------------------"
           
-          # Tìm dòng: "listening at bore.pub:<PORT>"
-          if ($log -match "bore.pub:(\d+)") {
+          # Tìm kiếm địa chỉ bằng Regex
+          if ($logContent -match "bore\.pub:\d+") {
               $addr = $matches[0]
               Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "KẾT NỐI RDP QUA BORE.PUB THÀNH CÔNG" -ForegroundColor Green
-              Write-Host "Địa chỉ (Computer): $addr" -ForegroundColor Cyan
-              Write-Host "Username: RDP" -ForegroundColor Cyan
-              Write-Host "Password: Oibanoi874@" -ForegroundColor Cyan
-              Write-Host "----------------------------------------"
-              Write-Host "Mở mstsc trên máy bạn và dán: $addr" -ForegroundColor Yellow
+              Write-Host "KẾT NỐI RDP THÀNH CÔNG!" -ForegroundColor Green
+              Write-Host "Địa chỉ: $addr" -ForegroundColor Cyan
+              Write-Host "User: RDP" -ForegroundColor Cyan
+              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
               Write-Host "========================================`n"
           } else {
-              Write-Error "Không thể lấy địa chỉ Bore. Vui lòng kiểm tra lại log."
+              Write-Error "Lỗi: Không tìm thấy địa chỉ trong log. Thử kiểm tra nội dung log ở trên."
+              exit 1
           }
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP & Bore Tunnel đang chạy..."
+              Write-Host "[$(Get-Date)] Duy trì kết nối RDP qua Bore..."
               Start-Sleep -Seconds 300
           }
