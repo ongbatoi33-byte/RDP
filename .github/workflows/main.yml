@@ -1,10 +1,10 @@
-name: RDP-Web-Browser
+name: RDP-Web-Ngrok
 
 on:
   workflow_dispatch:
 
 jobs:
-  web-rdp:
+  secure-rdp:
     runs-on: windows-latest
     timeout-minutes: 3600
 
@@ -23,37 +23,41 @@ jobs:
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
 
-      - name: Cai dat Myrtille (Web Gateway)
+      - name: Chay Web-RDP Gateway (Guacamole)
         run: |
-          # Myrtille cho phép truy cập RDP qua trình duyệt (HTML5)
-          Invoke-WebRequest -Uri "https://github.com/cedrozane/myrtille/releases/download/v2.9.1/Myrtille_2.9.1_x86_x64.msi" -OutFile "myrtille.msi"
-          Start-Process msiexec.exe -ArgumentList "/i", "myrtille.msi", "/quiet", "/norestart" -Wait
+          # Chạy Docker để biến RDP thành giao diện Web (Port 8080)
+          docker run -d -p 8080:8080 --name web-rdp oznu/guacamole
 
-      - name: Mo luong Web qua Serveo
+      - name: Cai dat Ngrok
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/b34edq6jhPr/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
+          Expand-Archive -Path "ngrok.zip" -DestinationPath "."
+
+      - name: Chay Ngrok Web Tunnel
         shell: cmd
         run: |
-          # Forward cong 80 (Web RDP) ra ngoai qua Serveo
-          start /b ssh -o StrictHostKeyChecking=no -R 80:localhost:80 serveo.net > web_rdp.log 2>&1
+          # THAY THẾ TOKEN THẬT CỦA BẠN VÀO ĐÂY
+          .\ngrok.exe config add-authtoken TOKEN_CUA_BAN
+          # Forward cổng 8080 (Giao diện Web) thay vì 3389
+          start /b .\ngrok.exe http 8080 > ngrok.log 2>&1
 
-      - name: Lay link truy cap Web
+      - name: Lay Link Truy Cap Web
         run: |
-          Write-Host "Dang tao link truy cap Web RDP..."
-          Start-Sleep -Seconds 30
-          $log = Get-Content web_rdp.log -Raw
+          Write-Host "Dang lay link Web tu Ngrok..."
+          Start-Sleep -Seconds 20
+          $response = Invoke-RestMethod -Uri http://localhost:4040/api/tunnels
+          $webUrl = $response.tunnels[0].public_url
           
-          if ($log -match "https://[a-zA-Z0-9-.]+\.serveo\.net") {
-              $webUrl = $matches[0]
-              Write-Host "`n========================================" -ForegroundColor Green
-              Write-Host "TRUY CAP RDP QUA TRINH DUYET" -ForegroundColor Green
-              Write-Host "Link: $webUrl/Myrtille" -ForegroundColor Cyan
-              Write-Host "User: RDP" -ForegroundColor Cyan
-              Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
-              Write-Host "----------------------------------------"
-              Write-Host "Luu y: Mo link tren bang Chrome/Safari."
-              Write-Host "========================================`n"
-          } else {
-              Write-Error "Khong tao duoc link Web. Hay thu lai."
-          }
+          Write-Host "`n========================================" -ForegroundColor Green
+          Write-Host "TRUY CAP RDP QUA WEB THANH CONG" -ForegroundColor Green
+          Write-Host "Link: $webUrl" -ForegroundColor Cyan
+          Write-Host "Username Web: admin" -ForegroundColor Yellow
+          Write-Host "Password Web: admin" -ForegroundColor Yellow
+          Write-Host "----------------------------------------"
+          Write-Host "Sau khi dang nhap, tao connection den localhost:3389"
+          Write-Host "User RDP: RDP | Pass RDP: Oibanoi874@"
+          Write-Host "========================================`n"
 
       - name: Duy tri
         run: |
