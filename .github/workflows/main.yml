@@ -1,4 +1,4 @@
-name: RDP-Web-Ngrok
+name: RDP-Web-Ngrok-Native
 
 on:
   workflow_dispatch:
@@ -23,10 +23,12 @@ jobs:
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
 
-      - name: Chay Web-RDP Gateway (Guacamole)
+      - name: Cai dat Myrtille (Web RDP Gateway)
         run: |
-          # Chạy Docker để biến RDP thành giao diện Web (Port 8080)
-          docker run -d -p 8080:8080 --name web-rdp oznu/guacamole
+          # Tai va cai dat Myrtille native cho Windows
+          $url = "https://github.com/cedrozane/myrtille/releases/download/v2.9.1/Myrtille_2.9.1_x86_x64.msi"
+          Invoke-WebRequest -Uri $url -OutFile "myrtille.msi"
+          Start-Process msiexec.exe -ArgumentList "/i", "myrtille.msi", "/quiet", "/norestart" -Wait
 
       - name: Cai dat Ngrok
         shell: powershell
@@ -37,9 +39,9 @@ jobs:
       - name: Chay Ngrok Web Tunnel
         shell: cmd
         run: |
-          # THAY THẾ TOKEN THẬT CỦA BẠN VÀO ĐÂY
-          .\ngrok.exe config add-authtoken TOKEN_CUA_BAN
-          # Forward cổng 8080 (Giao diện Web) thay vì 3389
+          # THAY TOKEN CUA BAN VAO DAY
+          .\ngrok.exe config add-authtoken 36VSC1MKYRQquiWADmIOVrNvasZ_3zyQHhjAXVYNjawNbxPB9
+          # Myrtille mac dinh chay tren cong 8080 (HTTP) hoac 443 (HTTPS)
           start /b .\ngrok.exe http 8080 > ngrok.log 2>&1
 
       - name: Lay Link Truy Cap Web
@@ -50,13 +52,12 @@ jobs:
           $webUrl = $response.tunnels[0].public_url
           
           Write-Host "`n========================================" -ForegroundColor Green
-          Write-Host "TRUY CAP RDP QUA WEB THANH CONG" -ForegroundColor Green
-          Write-Host "Link: $webUrl" -ForegroundColor Cyan
-          Write-Host "Username Web: admin" -ForegroundColor Yellow
-          Write-Host "Password Web: admin" -ForegroundColor Yellow
+          Write-Host "TRUY CAP RDP QUA TRINH DUYET" -ForegroundColor Green
+          Write-Host "Link: $webUrl/Myrtille" -ForegroundColor Cyan
+          Write-Host "User: RDP" -ForegroundColor Cyan
+          Write-Host "Pass: Oibanoi874@" -ForegroundColor Cyan
           Write-Host "----------------------------------------"
-          Write-Host "Sau khi dang nhap, tao connection den localhost:3389"
-          Write-Host "User RDP: RDP | Pass RDP: Oibanoi874@"
+          Write-Host "Luu y: Nhap 'localhost' vao o Server trong giao dien Web."
           Write-Host "========================================`n"
 
       - name: Duy tri
