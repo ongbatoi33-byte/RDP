@@ -47,7 +47,7 @@ jobs:
           Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath -UseBasicParsing
           Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-rdp-runner
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-game-runner
           
           $tsIP = ""
           for ($i=0; $i -lt 12; $i++) {
