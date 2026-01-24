@@ -1,65 +1,91 @@
-name: RDP-Web-Final-Solution
+name: RDP-Tailscale
 
 on:
   workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Link muốn mở tự động'
+        required: false
+        default: 'https://rescdnft97vn.xfplayvn.com/apk/NgocRongAwakenver228.exe'
 
 jobs:
-  run-rdp-web:
+  build:
     runs-on: windows-latest
     timeout-minutes: 3600
 
     steps:
-      - name: Cau hinh Windows RDP
+      - name: 1. Cấu hình Windows & User
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
+          
+          $username = "RDP"
+          $password = "${{ secrets.RDP_PASSWORD }}"
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          
+          if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) { Remove-LocalUser -Name $username }
+          New-LocalUser -Name $username -Password $securePass -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member $username
           Restart-Service -Name TermService -Force
 
-      - name: Tao nguoi dung RDP
+      - name: 2. Tối ưu Edge
         run: |
-          $password = "Oibanoi874@"
-          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
-          New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-
-      - name: Cai dat Ngrok
-        run: |
-          Invoke-WebRequest -Uri "https://bin.equinox.io/c/b34edq6jhPr/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
-          Expand-Archive -Path "ngrok.zip" -DestinationPath "."
-
-      - name: Cai dat RDP2Any (Web Gateway)
-        run: |
-          # Tai phiên bản chạy ngay không cần cài đặt
-          Invoke-WebRequest -Uri "https://github.com/SuRDP/RDP2Any/releases/download/v1.0/RDP2Any.exe" -OutFile "RDP2Any.exe"
-
-      - name: Chay Tunnel va Gateway
-        shell: cmd
-        run: |
-          # THAY TOKEN CUA BAN VAO DAY
-          .\ngrok.exe config add-authtoken 36VSC1MKYRQquiWADmIOVrNvasZ_3zyQHhjAXVYNjawNbxPB9
+          # Tạo các key Registry để ép Edge vào thẳng trang web
+          $edgeKey = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+          if (!(Test-Path $edgeKey)) { New-Item -Path $edgeKey -Force }
           
-          # Chay Gateway Web RDP tren cong 80
-          start /b .\RDP2Any.exe
-          
-          # Mo tunnel Ngrok cho cong Web (80)
-          start /b .\ngrok.exe http 80 > ngrok.log 2>&1
+          Set-ItemProperty -Path $edgeKey -Name "HideFirstRunExperience" -Value 1 -Force
+          Set-ItemProperty -Path $edgeKey -Name "AutoImportAtFirstRun" -Value 4 -Force
+          Set-ItemProperty -Path $edgeKey -Name "BrowserSignin" -Value 0 -Force
+          Write-Host "Da toi uu Edge: Khong hien bang chao mung."
 
-      - name: Lay Link Truy Cap
+      - name: 3. Cài đặt & Kết nối Tailscale
         run: |
-          Write-Host "Dang khoi tao link Web..."
-          Start-Sleep -Seconds 20
-          $response = Invoke-RestMethod -Uri http://localhost:4040/api/tunnels
-          $webUrl = $response.tunnels[0].public_url
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          $installerPath = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath -UseBasicParsing
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           
-          Write-Host "`n========================================" -ForegroundColor Green
-          Write-Host "TRUY CAP RDP QUA WEB THANH CONG" -ForegroundColor Green
-          Write-Host "Link: $webUrl" -ForegroundColor Cyan
-          Write-Host "----------------------------------------"
-          Write-Host "User: RDP | Pass: Oibanoi874@" -ForegroundColor Yellow
-          Write-Host "Luu y: Neu web hien thi bảng đăng nhập, hay nhap thong tin tren."
-          Write-Host "========================================`n"
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-rdp-runner
+          
+          $tsIP = ""
+          for ($i=0; $i -lt 12; $i++) {
+              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              if ($tsIP) { break }
+              Start-Sleep -Seconds 5
+          }
+          echo "TS_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Duy tri
+      - name: 4. Tự động mở Edge khi Login
         run: |
-          while ($true) { Start-Sleep -Seconds 300 }
+          $username = "RDP"
+          $targetUrl = "${{ github.event.inputs.target_url }}"
+          $startupPath = "C:\Users\$username\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+          
+          if (!(Test-Path $startupPath)) { New-Item -ItemType Directory -Path $startupPath -Force }
+          icacls "C:\Users\$username" /grant "${username}:(OI)(CI)F" /T /C /Q
+          
+          $WshShell = New-Object -ComObject WScript.Shell
+          $Shortcut = $WshShell.CreateShortcut("$startupPath\AutoOpen.lnk")
+          $Shortcut.TargetPath = "msedge.exe"
+          $Shortcut.Arguments = "--start-maximized --no-first-run $targetUrl"
+          $Shortcut.Save()
+
+      - name: 5. THÔNG TIN KẾT NỐI
+        run: |
+          Write-Host "`n"
+          Write-Host "############################################################" -ForegroundColor Cyan
+          Write-Host "      THONG TIN DANG NHAP REMOTE DESKTOP (RDP)" -ForegroundColor Yellow
+          Write-Host "############################################################" -ForegroundColor Cyan
+          Write-Host " [>] IP ADDRESS : $env:TS_IP" -ForegroundColor Green
+          Write-Host " [>] USERNAME   : RDP" -ForegroundColor Green
+          Write-Host " [>] PASSWORD   : ${{ secrets.RDP_PASSWORD }}" -ForegroundColor Green
+          Write-Host " [>] AUTO OPEN  : ${{ github.event.inputs.target_url }}" -ForegroundColor Green
+          Write-Host "############################################################" -ForegroundColor Cyan
+          
+          while ($true) {
+              $time = Get-Date -Format "HH:mm:ss"
+              Write-Host "[$time] Runner dang online tai IP: $env:TS_IP"
+              Start-Sleep -Seconds 300
+          }
