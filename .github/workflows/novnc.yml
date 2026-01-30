@@ -1,0 +1,40 @@
+name: Ubuntu_noVNC
+
+on: workflow_dispatch # Kích hoạt thủ công
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cài đặt môi trường đồ họa
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies tightvncserver python3-pip
+          
+      - name: Cài đặt noVNC
+        run: |
+          git clone https://github.com/novnc/noVNC.git
+          cp noVNC/vnc.html noVNC/index.html
+          
+      - name: Cài đặt ngrok
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install ngrok
+
+      - name: Khởi tạo VNC và ngrok
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          # Thiết lập pass VNC là '123456'
+          mkdir -p ~/.vnc
+          echo "123456" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+          tightvncserver :1
+          
+          # Chạy noVNC proxy trên port 6080
+          ./noVNC/utils/novnc_proxy --vnc localhost:5901 --listen 6080 &
+          
+          # Mở tunnel qua ngrok
+          ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          ngrok http 6080
