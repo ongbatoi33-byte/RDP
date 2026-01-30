@@ -1,4 +1,4 @@
-name: Tailscale SSH No Password
+name: Tailscale SSH Fixed
 on: workflow_dispatch
 
 jobs:
@@ -13,25 +13,24 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: Disable SSH Password Prompt
+      - name: Setup SSH No Password
         run: |
-          # 1. Bật Tailscale với tính năng SSH
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --ssh --hostname=github-runner
-
-          # 2. Xóa mật khẩu của user runner (biến nó thành null/empty)
+          # 1. Thêm flag --reset để sửa lỗi "non-default flags"
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --ssh --hostname=github-runner --reset
+          
+          # 2. Xóa mật khẩu của user runner
           sudo passwd -d runner
           
-          # 3. Cấu hình SSH Server cho phép mật khẩu trống và không yêu cầu xác thực
-          sudo sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config
+          # 3. Cấu hình SSH cho phép pass trống (Dùng lệnh sudo tee để ghi file an toàn hơn)
+          echo "PermitEmptyPasswords yes" | sudo tee -a /etc/ssh/sshd_config
+          echo "UsePAM no" | sudo tee -a /etc/ssh/sshd_config
           
-          # 4. Khởi động lại dịch vụ SSH để áp dụng thay đổi
+          # 4. Khởi động lại SSH
           sudo systemctl restart ssh
 
           echo "================================================"
           echo "IP: $(tailscale ip -4)"
           echo "Lệnh kết nối: ssh runner@$(tailscale ip -4)"
-          echo "NẾU HỎI PASS: Chỉ cần nhấn ENTER (vì pass đã bị xóa)"
           echo "================================================"
 
       - name: Keep Alive
