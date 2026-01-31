@@ -1,4 +1,4 @@
-name: Android Cloud Phone Azure-Fix
+name: Android Cloud Phone Final-Fix
 on: workflow_dispatch
 
 jobs:
@@ -11,19 +11,14 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
           args: --ssh --hostname=cloud-phone
 
-      - name: Install Docker and Setup
+      - name: Install Docker
         run: |
-          # Gỡ xung đột và cài Docker sạch
           sudo apt-get remove -y containerd.io containerd runc
           sudo apt-get update
           sudo apt-get install -y docker.io
-          
-          # Không dùng modprobe vì Kernel Azure không hỗ trợ trực tiếp
-          # Chúng ta sẽ ép Redroid sử dụng bộ nhớ mô phỏng
 
-      - name: Launch Redroid (Special Config for Azure)
+      - name: Launch Redroid (Android 11)
         run: |
-          # Dùng mode privileged và các tham số ép buộc để Android tự khởi tạo bộ nhớ
           sudo docker run -d -p 5555:5555 \
             --name redroid11 \
             --privileged \
@@ -31,21 +26,22 @@ jobs:
             androidboot.redroid_width=720 \
             androidboot.redroid_height=1280 \
             androidboot.redroid_dpi=320 \
-            androidboot.redroid_fps=30 \
-            redroid.gpu.mode=guest \
-            redroid.behold=1
+            redroid.gpu.mode=guest
 
-      - name: Setup Web-ADB Control
+      - name: Setup Web Control (New Image)
         run: |
-          # Chạy giao diện Web trên cổng 80
-          sudo docker run -d -p 80:80 \
-            --name web-adb \
-            yumechan/ya-webadb:latest
+          # Sử dụng ws-scrcpy: Đây là bản xịn nhất để điều khiển Android qua trình duyệt
+          # Nó cho phép bạn thấy màn hình chạy thời gian thực (real-time)
+          sudo docker run -d -p 80:8000 \
+            --name cloud-controller \
+            --link redroid11:android \
+            -e ADB_SERVER_IP=android \
+            -e ADB_SERVER_PORT=5555 \
+            sandreas/ws-scrcpy:latest
 
           echo "================================================"
-          echo "Android đang khởi chạy trên Kernel Azure..."
-          echo "IP: $(tailscale ip -4)"
-          echo "Hãy đợi 2-3 phút để Android boot xong rồi mới truy cập."
+          echo "Android đang khởi động..."
+          echo "Địa chỉ Cloud Phone: http://$(tailscale ip -4)"
           echo "================================================"
 
       - name: Keep Alive
