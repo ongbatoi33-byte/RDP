@@ -1,8 +1,8 @@
-name: Kali Pro Station Ultimate
+name: ssh
 on: workflow_dispatch
 
 jobs:
-  hacking-station:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -13,7 +13,7 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
           # --ssh để dùng tính năng Tailscale SSH, --reset để xóa cấu hình cũ
-          args: --ssh --hostname=kali-station --reset
+          args: --ssh --hostname=ssh --reset
 
       - name: Install Hacking Tools & Pro Shell
         run: |
@@ -32,10 +32,8 @@ jobs:
           git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
           git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
           
-          # Kích hoạt plugins trong .zshrc và thêm phím tắt (alias)
+          # Kích hoạt plugins trong .zshrc 
           sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
-          echo "alias msf='sudo msfconsole'" >> ~/.zshrc
-          echo "alias b='bore local 4444 --to bore.pub'" >> ~/.zshrc
           
           # Đổi shell mặc định sang zsh cho user runner
           sudo chsh -s $(which zsh) runner
@@ -69,13 +67,8 @@ jobs:
           echo "STATION CỦA BẠN ĐÃ SẴN SÀNG!"
           echo "----------------------------------------------------"
           echo "IP Tailscale: $(tailscale ip -4)"
-          echo "Hostname: kali-station"
-          echo "Lệnh kết nối: ssh runner@kali-station"
-          echo "----------------------------------------------------"
-          echo "Phím tắt đã cài:"
-          echo " - msf : Mở Metasploit"
-          echo " - b   : Chạy Bore forward port 4444"
-          echo "Plugins: Gợi ý lệnh (mũi tên phải để chọn), Highlight màu sắc"
+          echo "Hostname: ssh"
+          echo "Lệnh kết nối: ssh runner@ssh"
           echo "===================================================="
           
       - name: Keep Alive
