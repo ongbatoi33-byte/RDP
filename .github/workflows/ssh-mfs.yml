@@ -1,11 +1,11 @@
-name: ssh_metasploid
+name: Kali Pro Station Fixed V2
 on: workflow_dispatch
 
 jobs:
-  build:
+  hacking-station:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Connect to Tailscale
@@ -14,49 +14,46 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
           args: --ssh --hostname=kali-station --reset
 
-      - name: Install Tools & Fix Errors
+      - name: Install Hacking Tools
         run: |
-          # 0. Cập nhật hệ thống
-          sudo apt-get update
-          
-          # 1. FIX LỖI GIT (Cực kỳ quan trọng để Metasploit không lỗi)
+          # 0. Fix Git Identity
           git config --global user.email "kali@example.com"
           git config --global user.name "KaliRunner"
-
-          # 2. CÀI METASPLOIT (Dùng script omnibus chính thức)
-          echo "--- Đang cài Metasploit ---"
+          
+          sudo apt-get update
+          
+          # 1. Cài đặt Metasploit (Sử dụng script ổn định nhất)
+          echo "--- Installing Metasploit ---"
           curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > msfinstall
           chmod +x msfinstall
           sudo ./msfinstall
 
-          # 3. CÀI NGROK
-          echo "--- Đang cài Ngrok ---"
+          # 2. Cài đặt Ngrok
+          echo "--- Installing Ngrok ---"
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt-get update && sudo apt-get install -y ngrok
 
-          # 4. CÀI BORE (Forward port cực nhanh)
-          echo "--- Đang cài Bore ---"
-          sudo apt-get install -y golang
-          export GOPATH=$HOME/go
-          export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
-          go install github.com/ekzhang/bore@latest
-          sudo cp $HOME/go/bin/bore /usr/local/bin/ || sudo cp /home/runner/go/bin/bore /usr/local/bin/
+          # 3. Cài đặt BORE (Tải Binary trực tiếp - KHÔNG DÙNG GO INSTALL)
+          echo "--- Installing Bore via Binary ---"
+          curl -Ls https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-unknown-linux-musl.tar.gz | tar zx
+          sudo mv bore /usr/local/bin/
+          chmod +x /usr/local/bin/bore
 
-          # 5. CẤU HÌNH SSH (Cho phép kết nối qua Tailscale)
+          # 4. SSH Setup (No Password)
           sudo passwd -d runner
           echo "PermitEmptyPasswords yes" | sudo tee -a /etc/ssh/sshd_config
           echo "UsePAM no" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: Success Info
+      - name: System Info
         run: |
           echo "================================================"
-          echo "KALI STATION ĐÃ SẴN SÀNG!"
+          echo "KALI STATION READY!"
           echo "IP Tailscale: $(tailscale ip -4)"
-          echo "Thử lệnh: msfconsole -v"
+          echo "Bore version: $(bore --version)"
           echo "Lệnh SSH: ssh runner@kali-station"
           echo "================================================"
-
+          
       - name: Keep Alive
-        run: sleep 21600 # Chạy trong 6 tiếng
+        run: sleep 21600
