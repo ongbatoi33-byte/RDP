@@ -1,4 +1,4 @@
-name: Kali Pro Station Fixed V2
+name: Kali Pro Station Ultimate
 on: workflow_dispatch
 
 jobs:
@@ -12,48 +12,72 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          # --ssh để dùng tính năng Tailscale SSH, --reset để xóa cấu hình cũ
           args: --ssh --hostname=kali-station --reset
 
-      - name: Install Hacking Tools
+      - name: Install Hacking Tools & Pro Shell
         run: |
-          # 0. Fix Git Identity
+          # 0. Cấu hình Git để tránh lỗi cài Metasploit
           git config --global user.email "kali@example.com"
           git config --global user.name "KaliRunner"
-          
           sudo apt-get update
           
-          # 1. Cài đặt Metasploit (Sử dụng script ổn định nhất)
-          echo "--- Installing Metasploit ---"
+          # 1. Cài đặt các gói cơ bản & Screen & Zsh
+          sudo apt-get install -y zsh screen curl git golang-go
+
+          # 2. Cài đặt Oh My Zsh (Chế độ tự động, không hỏi)
+          sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+          
+          # 3. Cài đặt Plugins cho Zsh (Auto-suggestions & Syntax Highlighting)
+          git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+          git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+          
+          # Kích hoạt plugins trong .zshrc và thêm phím tắt (alias)
+          sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+          echo "alias msf='sudo msfconsole'" >> ~/.zshrc
+          echo "alias b='bore local 4444 --to bore.pub'" >> ~/.zshrc
+          
+          # Đổi shell mặc định sang zsh cho user runner
+          sudo chsh -s $(which zsh) runner
+
+          # 4. Cài đặt Metasploit (Dùng bản Omnibus ổn định)
+          echo "--- Đang cài Metasploit ---"
           curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > msfinstall
           chmod +x msfinstall
           sudo ./msfinstall
 
-          # 2. Cài đặt Ngrok
-          echo "--- Installing Ngrok ---"
+          # 5. Cài đặt Bore (Tải Binary trực tiếp để tránh lỗi Go package)
+          echo "--- Đang cài Bore ---"
+          curl -Ls https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-unknown-linux-musl.tar.gz | tar zx
+          sudo mv bore /usr/local/bin/ && chmod +x /usr/local/bin/bore
+
+          # 6. Cài đặt Ngrok (Repo chính thức)
+          echo "--- Đang cài Ngrok ---"
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt-get update && sudo apt-get install -y ngrok
 
-          # 3. Cài đặt BORE (Tải Binary trực tiếp - KHÔNG DÙNG GO INSTALL)
-          echo "--- Installing Bore via Binary ---"
-          curl -Ls https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-unknown-linux-musl.tar.gz | tar zx
-          sudo mv bore /usr/local/bin/
-          chmod +x /usr/local/bin/bore
-
-          # 4. SSH Setup (No Password)
+          # 7. Cấu hình SSH No Password (Dành cho Tailscale SSH)
           sudo passwd -d runner
           echo "PermitEmptyPasswords yes" | sudo tee -a /etc/ssh/sshd_config
           echo "UsePAM no" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: System Info
+      - name: System Ready Info
         run: |
-          echo "================================================"
-          echo "KALI STATION READY!"
+          echo "===================================================="
+          echo "STATION CỦA BẠN ĐÃ SẴN SÀNG!"
+          echo "----------------------------------------------------"
           echo "IP Tailscale: $(tailscale ip -4)"
-          echo "Bore version: $(bore --version)"
-          echo "Lệnh SSH: ssh runner@kali-station"
-          echo "================================================"
+          echo "Hostname: kali-station"
+          echo "Lệnh kết nối: ssh runner@kali-station"
+          echo "----------------------------------------------------"
+          echo "Phím tắt đã cài:"
+          echo " - msf : Mở Metasploit"
+          echo " - b   : Chạy Bore forward port 4444"
+          echo "Plugins: Gợi ý lệnh (mũi tên phải để chọn), Highlight màu sắc"
+          echo "===================================================="
           
       - name: Keep Alive
+        # Giữ máy chạy trong 6 tiếng (21600 giây)
         run: sleep 21600
