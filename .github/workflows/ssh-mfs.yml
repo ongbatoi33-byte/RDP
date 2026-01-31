@@ -1,11 +1,11 @@
-name: ssh
+name: ssh_metasploid
 on: workflow_dispatch
 
 jobs:
-  hacking-station:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Connect to Tailscale
@@ -14,45 +14,49 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
           args: --ssh --hostname=kali-station --reset
 
-      - name: Install Hacking Tools
+      - name: Install Tools & Fix Errors
         run: |
+          # 0. Cập nhật hệ thống
           sudo apt-get update
           
-          # 1. Cài đặt Metasploit (Sử dụng gói deb chính thức để tránh lỗi script)
-          echo "--- Installing Metasploit ---"
-          curl -s https://raw.githubusercontent.com/rapid7/metasploit-framework/master/msfupdate > msfinstall
+          # 1. FIX LỖI GIT (Cực kỳ quan trọng để Metasploit không lỗi)
+          git config --global user.email "kali@example.com"
+          git config --global user.name "KaliRunner"
+
+          # 2. CÀI METASPLOIT (Dùng script omnibus chính thức)
+          echo "--- Đang cài Metasploit ---"
+          curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > msfinstall
           chmod +x msfinstall
           sudo ./msfinstall
-          
-          # 2. Cài đặt Ngrok
-          echo "--- Installing Ngrok ---"
+
+          # 3. CÀI NGROK
+          echo "--- Đang cài Ngrok ---"
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt-get update && sudo apt-get install -y ngrok
 
-          # 3. Cài đặt Bore (Sử dụng Go)
-          echo "--- Installing Bore via Go ---"
+          # 4. CÀI BORE (Forward port cực nhanh)
+          echo "--- Đang cài Bore ---"
           sudo apt-get install -y golang
-          # Thiết lập PATH để nhận diện lệnh go ngay lập tức
           export GOPATH=$HOME/go
           export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
           go install github.com/ekzhang/bore@latest
           sudo cp $HOME/go/bin/bore /usr/local/bin/ || sudo cp /home/runner/go/bin/bore /usr/local/bin/
 
-          # 4. Cấu hình SSH (Không mật khẩu)
+          # 5. CẤU HÌNH SSH (Cho phép kết nối qua Tailscale)
           sudo passwd -d runner
           echo "PermitEmptyPasswords yes" | sudo tee -a /etc/ssh/sshd_config
           echo "UsePAM no" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: System Info & Ready
+      - name: Success Info
         run: |
           echo "================================================"
-          echo "KALI STATION READY!"
-          echo "IP: $(tailscale ip -4)"
-          echo "MSF Version: $(msfconsole -v)"
+          echo "KALI STATION ĐÃ SẴN SÀNG!"
+          echo "IP Tailscale: $(tailscale ip -4)"
+          echo "Thử lệnh: msfconsole -v"
           echo "Lệnh SSH: ssh runner@kali-station"
           echo "================================================"
-          
+
       - name: Keep Alive
-        run: sleep 21600
+        run: sleep 21600 # Chạy trong 6 tiếng
