@@ -1,0 +1,55 @@
+name: Kali Pro Station
+on: workflow_dispatch
+
+jobs:
+  hacking-station:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          args: --ssh --hostname=kali-station --reset
+
+      - name: Install Hacking Tools
+        run: |
+          sudo apt-get update
+          
+          # 1. Cài đặt Metasploit (Bản chính thức)
+          echo "--- Installing Metasploit ---"
+          curl https://raw.githubusercontent.com/rapid7/metasploit-framework/master/msfupdate | sudo bash
+          
+          # 2. Cài đặt Ngrok
+          echo "--- Installing Ngrok ---"
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update && sudo apt-get install ngrok
+          # Nếu bạn có NGROK_TOKEN, hãy thêm vào Secret và chạy: ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+
+          # 3. Cài đặt Bore (Lệnh cài đặt qua Go)
+          echo "--- Installing Bore via Go ---"
+          sudo apt-get install -y golang
+          go install github.com/ekzhang/bore@latest
+          sudo cp ~/go/bin/bore /usr/local/bin/
+
+          # 4. Thiết lập User & SSH
+          sudo passwd -d runner
+          echo "PermitEmptyPasswords yes" | sudo tee -a /etc/ssh/sshd_config
+          echo "UsePAM no" | sudo tee -a /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+
+      - name: System Info & Ready
+        run: |
+          echo "================================================="
+          echo "KALI STATION IS READY!"
+          echo "Tailscale IP: $(tailscale ip -4)"
+          echo "Metasploit: msfconsole -v"
+          echo "Bore: bore local 8080 --to bore.pub"
+          echo "Kết nối: ssh runner@kali-station"
+          echo "================================================="
+          
+      - name: Keep Alive
+        run: sleep 21600
