@@ -28,6 +28,9 @@ jobs:
           # 2. Cài đặt Oh My Zsh (Chế độ tự động, không hỏi)
           sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
           
+          sed -i '1i ZSH_DISABLE_COMPFIX="true"' ~/.zshrc
+          sudo chmod -R g-w,o-w /usr/share/zsh
+          
           # 3. Cài đặt Plugins cho Zsh (Auto-suggestions & Syntax Highlighting)
           git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
           git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
