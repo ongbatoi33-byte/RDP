@@ -1,0 +1,41 @@
+name: Android Cloud Phone
+on: workflow_dispatch
+
+jobs:
+  cloud-phone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          args: --ssh --hostname=cloud-phone
+
+      - name: Install Desktop & Docker Android
+        run: |
+          sudo apt-get update
+          # Cài đặt Docker
+          sudo apt-get install -y docker.io
+          
+          # Chạy Redroid (Android 11 trên Docker - Nhẹ và mượt nhất cho Cloud)
+          sudo docker run -d -p 5555:5555 \
+            --name redroid11 \
+            --privileged \
+            redroid/redroid:11.0.0-latest \
+            androidboot.redroid_width=720 \
+            androidboot.redroid_height=1280 \
+            androidboot.redroid_dpi=320
+
+          # Cài đặt Web-ADB (Để điều khiển qua trình duyệt)
+          sudo docker run -d -p 8080:80 \
+            --name web-adb \
+            -e ADB_SERVER_SOCKET=tcp:$(tailscale ip -4):5555 \
+            yumechan/ya-webadb:latest
+
+          echo "================================================"
+          echo "Android đang khởi động..."
+          echo "Truy cập Cloud Phone qua trình duyệt tại địa chỉ:"
+          echo "http://$(tailscale ip -4):8080"
+          echo "================================================"
+          
+          sleep 21600
